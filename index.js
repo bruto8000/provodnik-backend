@@ -36,6 +36,7 @@ function prepareDatesForMysql(columnsOfDates) {
         date = "01 " + date;
       }
       req.body[column] = date.split(" ").reverse().join("-");
+      console.log(req.body[column]);
     });
 
     next();
@@ -46,12 +47,13 @@ function prepareDatesForClient(columnsOfDates) {
     rows.forEach((row) => {
       columnsOfDates.forEach((column) => {
         if (typeof row[column] != "string" && row[column] != null) {
-          console.log("step2");
           if (row.is_month && column === "sdate") {
             row[column] = row[column].mmyyyy();
           } else {
             row[column] = row[column].ddmmyyyy();
           }
+        } else if (typeof row[column] == "string") {
+          row[column] = "";
         }
       });
     });
@@ -78,6 +80,7 @@ function prepareArraysForClient(columnsOfArrays) {
           row[column] = JSON.parse(row[column]);
         } catch (err) {
           console.log("CANT BE PARSED", row[column]);
+          row[column] = [];
         }
       });
     });
@@ -86,6 +89,7 @@ function prepareArraysForClient(columnsOfArrays) {
 function clearRequest(columnsNeed) {
   return function (req, res, next) {
     let newReqBody = {};
+    console.log(req.body);
     columnsNeed.forEach((column) => {
       newReqBody[column] = req.body[column];
     });
@@ -94,11 +98,9 @@ function clearRequest(columnsNeed) {
   };
 }
 ///////////////////// CONFIGS ////////////////////////////////
-//\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 ////// ACTIVITIES ///////
-
-function monthCheck(req, res, next) {
+function activitiesMonthCheck(req, res, next) {
   let date = req.sdate;
   if (/^\d\d\s\d\d\d\d$/.test(date)) {
     req.body.is_month = true;
@@ -108,7 +110,7 @@ function monthCheck(req, res, next) {
   next();
 }
 
-const activityArrays = [
+const activitiesArrays = [
   "flags",
   "audits",
   "AB",
@@ -120,9 +122,9 @@ const activityArrays = [
   "tags",
   "zamenas",
 ];
-const activityDates = ["sdate", "fdate"];
+const activitiesDates = ["sdate", "fdate"];
 
-const activityNeedColumns = [
+const activitiesNeedColumnsForEdit = [
   "id",
   "fdate",
   "sdate",
@@ -147,8 +149,47 @@ const activityNeedColumns = [
   "tags",
   "zamenas",
 ];
+const activitiesNeedColumnsForAdd = [
+  "fdate",
+  "sdate",
+  "nazvanie",
+  "opisanieBody",
+  "zakazchik",
+  "bizness",
+  "zapusk",
+  "status",
+  "soprovod",
+  "audits",
+  "flags",
+  "risks",
+  "difficulty",
+];
 
-////// ACTIVITIES ///////
+//// Employees /////
+
+const employeesNeedColumnsForEdit = ["id", "full_name", "login"];
+
+//// INFOQUERIES ////
+
+const infoqueriesArrays = ["statuses"];
+const infoqueriesDates = ["sdate", "fdate"];
+
+const infoqueriesNeedColumns = [
+  "archived",
+  "classification",
+  "deleted",
+  "fdate",
+  "id",
+  "inicatior",
+  "nazvanie",
+  "otchot",
+  "otvetfrom",
+  "otvetstveniy",
+  "problem",
+  "produkt",
+  "sdate",
+  "statuses",
+];
 
 let db_config = {
   host: "192.168.0.104",
@@ -184,13 +225,15 @@ app.use(express.json());
 
 // app.use((req, res, next) => {});
 app.all("*", (req, res, next) => {
-  console.log("req");
-  console.log(req.url);
+  console.log(`request URL : ${req.url} //\\\\ METHOD IS ${req.method}`);
+
   next();
 });
 
 app.get("/vendor/showEmployees", (req, res) => {
-  executeQuery("SELECT * FROM EMPLOYEES WHERE is_deleted = 0") //Да, тут наоборот
+  executeQuery(
+    "SELECT * FROM EMPLOYEES WHERE is_deleted = 0 OR is_deleted is null"
+  )
     .then((results) => {
       res.end(JSON.stringify(results));
     })
@@ -205,19 +248,8 @@ app.get("/vendor/showActivities", (req, res) => {
     "SELECT * FROM projects WHERE is_deleted = 0 AND is_archived = 0"
   )
     .then((resultRows) => {
-      prepareDatesForClient(["fdate", "sdate"])(resultRows);
-      prepareArraysForClient([
-        "flags",
-        "audits",
-        "AB",
-        "ocenka",
-        "statusZapusk",
-        "risks",
-        "bugs",
-        "eGrafiks",
-        "tags",
-        "zamenas",
-      ])(resultRows);
+      prepareDatesForClient(activitiesDates)(resultRows);
+      prepareArraysForClient(activitiesArrays)(resultRows);
 
       res.end(JSON.stringify(resultRows));
     })
@@ -230,20 +262,8 @@ app.get("/vendor/showActivities", (req, res) => {
 app.get("/vendor/showInfoQueries", (req, res) => {
   executeQuery("SELECT * FROM infoQueries")
     .then((resultRows) => {
-      let jsonedColumns = ["statuses"];
-
-      resultRows.forEach((row, idx) => {
-        jsonedColumns.forEach((column) => {
-          if (row[column] === null) row[column] = [];
-          else {
-            try {
-              row[column] && (row[column] = JSON.parse(row[column]));
-            } catch (err) {
-              console.log(row["id"], "cant be parsed");
-            }
-          }
-        });
-      });
+      prepareDatesForClient(infoqueriesDates)(resultRows);
+      prepareArraysForClient(infoqueriesArrays)(resultRows);
 
       res.end(JSON.stringify(resultRows));
     })
@@ -278,27 +298,20 @@ app.get("/vendor/showTabel", (req, res) => {
     });
 });
 
-app.post("/vendor/addEmployee", (req, res) => {
-  let query = `SELECT * FROM employees WHERE nid = ${req.nid}`;
-
-  // let query = mysql.format("INSERT INTO employees SET  ?", req.body);
-  // executeQuery(query).then(()=>res.end('OK')).catch(()=>{
-  //   res.status(404).end('sik')
-  // })
-  res.status(404).end("sik");
-});
+//ACTIVITIES//
 
 app.post(
   "/vendor/addActivity",
-  prepareDatesForMysql([activityDates]),
-  prepareArraysForMysql(activityArrays),
-  monthCheck,
+  clearRequest(activitiesNeedColumnsForAdd),
+  prepareDatesForMysql(activitiesDates),
+  prepareArraysForMysql(activitiesArrays),
+  activitiesMonthCheck,
   (req, res) => {
-    let query = mysql.format("INSERT INTO projects SET  ?", req.body);
+    let sql = mysql.format("INSERT INTO projects SET  ?", req.body);
 
-    // res.status(404).end();
-    executeQuery(query)
+    executeQuery(sql)
       .then((result) => {
+        res.status(404);
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
@@ -309,10 +322,10 @@ app.post(
 
 app.post(
   "/vendor/editActivity",
-  clearRequest(activityNeedColumns),
-  prepareDatesForMysql(activityDates),
-  prepareArraysForMysql(activityArrays),
-  monthCheck,
+  clearRequest(activitiesNeedColumnsForEdit),
+  prepareDatesForMysql(activitiesDates),
+  prepareArraysForMysql(activitiesArrays),
+  activitiesMonthCheck,
   (req, res, next) => {
     let id = req.body.id;
     delete req.body.id;
@@ -332,21 +345,156 @@ app.post(
   }
 );
 
-app.post('/vendor/deleteActivity', (req,res)=>{
-console.log(req.body)
-let sql = `UPDATE projects SET is_deleted = true WHERE id=${req.body.id}`;
+app.post("/vendor/deleteActivity", (req, res) => {
+  console.log(req.body);
+  let sql = `UPDATE projects SET is_deleted = true WHERE id=${req.body.id}`;
 
-executeQuery(sql)
-.then(()=>{
-  res.end('OK')
-})
-.catch((err)=>{
+  executeQuery(sql)
+    .then(() => {
+      res.end("OK");
+    })
+    .catch((err) => {
+      res.status(500).end(err.toString());
+    });
+});
 
-  res.status(500).end(err.toString())
-})
-})
+app.post("/vendor/changeOcenka", (req, res, next) => {
+  let sql = `UPDATE  projects SET  ocenka='${JSON.stringify(
+    req.body.ocenka
+  )}' WHERE id='${req.body.id}'`;
+  executeQuery(sql)
+    .then(() => {
+      res.end("OK");
+    })
+    .catch((err) => {
+      res.status(400).emd(JSON.stringify(err));
+    });
+});
 
-app.all('*',(req,res)=>res.status(400).end(''))
+// Employees//
+app.post("/vendor/deleteEmployee", (req, res) => {
+  let sql = `UPDATE  employees SET  is_deleted=true WHERE id='${req.body.id}'`;
+  executeQuery(sql)
+    .then(() => {
+      res.end("OK");
+    })
+    .catch((err) => {
+      res.status(400).end(JSON.stringify(err));
+    });
+});
+app.post("/vendor/addEmployee", (req, res) => {
+  console.log("start");
+  let sql = `SELECT * FROM employees WHERE nid='${req.body.nid}'`;
+
+  executeQuery(sql)
+    .catch((err) => {
+      res.status(400).end(err);
+    })
+    .then((founded) => {
+      if (founded.length) {
+        res.status(400).end("NID");
+      } else {
+        let sql = mysql.format("INSERT INTO employees SET  ?", {
+          nid: req.body.nid,
+          login: req.body.login,
+          full_name: req.body.full_name,
+        });
+
+        executeQuery(sql)
+          .then(() => {
+            res.end("OK");
+          })
+
+          .catch((err) => {
+            res.end(err.toString());
+          });
+      }
+    });
+});
+app.post(
+  "/vendor/editEmployee",
+  clearRequest(employeesNeedColumnsForEdit),
+  (req, res) => {
+    let id = req.body.id;
+    delete req.body.id;
+    let sql = mysql.format("UPDATE  employees SET  ? WHERE id=?", [
+      req.body,
+      id,
+    ]);
+    console.log(sql);
+    executeQuery(sql)
+      .then(() => {
+        res.end("OK");
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(400).end(JSON.stringify(err));
+      });
+  }
+);
+
+//INFOQUERIES//
+
+app.post(
+  "/vendor/addInfoQuery",
+  clearRequest(infoqueriesNeedColumns),
+  prepareDatesForMysql(infoqueriesDates),
+  prepareArraysForMysql(infoqueriesArrays),
+  (req, res) => {
+    let query = mysql.format("INSERT INTO infoqueries SET  ?", req.body);
+
+    executeQuery(query)
+      .then((result) => {
+        res.end(JSON.stringify(result.insertId));
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  }
+);
+
+app.post(
+  "/vendor/editInfoQuery",
+  clearRequest(infoqueriesNeedColumns),
+  prepareDatesForMysql(infoqueriesDates),
+  prepareArraysForMysql(infoqueriesArrays),
+
+  (req, res, next) => {
+    let id = req.body.id;
+    delete req.body.id;
+    let query = mysql.format("UPDATE  infoqueries SET  ? WHERE id=?", [
+      req.body,
+      id,
+    ]);
+    executeQuery(query)
+      .then((result) => {
+        res.end(JSON.stringify(result.insertId));
+      })
+      .catch((err) => {
+        console.log(err);
+
+        res.status(404).end();
+      });
+  }
+);
+
+app.post("/vendor/deleteInfoQuery", (req, res) => {
+  console.log(req.body);
+  let sql = `UPDATE infoqueries SET is_deleted = true WHERE id=${req.body.id}`;
+
+  executeQuery(sql)
+    .then(() => {
+      res.end("OK");
+    })
+    .catch((err) => {
+      res.status(400).end(err.toString());
+    });
+});
+
+app.all("*", (req, res) => {
+  res.status(404).end("NOT FOUND");
+});
+
 function executeQuery(query) {
   return new Promise((resolve, reject) => {
     connection.query(query, function (error, result, field) {
@@ -358,4 +506,4 @@ function executeQuery(query) {
   });
 }
 
-app.listen(3000, console.log("server started"));
+app.listen(3000, console.log("server started ON PORT 3000"));
