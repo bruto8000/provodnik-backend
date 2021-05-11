@@ -261,17 +261,12 @@ const projectsNeedColumns = [
   "efficiency",
 ];
 
-let db_config = {
-  host: "192.168.0.104",
-  user: "root",
-  password: "bruto",
-  database: "provodnik",
-};
-
+let dbCoinfig = require('./dbCoinfig');
+console.log(dbCoinfig)
 let connection;
 
 function handleDisconnect() {
-  connection = mysql.createConnection(db_config);
+  connection = mysql.createConnection(dbCoinfig);
 
   connection.connect(function (err) {
     if (err) {
