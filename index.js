@@ -56,35 +56,33 @@ function prepareDatesForClient(settings) {
   //   }
   return function (rows) {
     rows.forEach((row) => {
-    
+  
 
       settings.month &&
         settings.month.forEach((column) => {
           if (!row.is_month) return;
           if (typeof row[column] == "object") {
             row[column] = row[column].mmyyyy();
-          } else if (typeof row[column] == "string") {
-            row[column] = "";
-          }
+   
+          } 
         });
 
-      settings.kvartal &&
+  settings.kvartal &&
         settings.kvartal.forEach((column) => {
           if (!row.is_kvartal) return;
           if (typeof row[column] == "object") {
+         
             row[column] = row[column].kkyyyy();
-          } else if (typeof row[column] == "string") {
-            row[column] = "";
-          }
+         
+          } 
         });
 
-        settings.all &&
+      settings.all &&
         settings.all.forEach((column) => {
-        
           if (typeof row[column] == "object") {
         
             row[column] = row[column].ddmmyyyy();
-          } else if (typeof row[column] == "string") {
+          } else if (typeof row[column] == "string" && /\d\d\d\d\-\d\d\-\d\d/.test(row[column]) ) {
             row[column] = "";
           }
         });
@@ -130,8 +128,8 @@ function clearRequest(columnsNeed) {
 }
 ////// ACTIVITIES ///////
 function activitiesMonthCheck(req, res, next) {
-  if (/^\d\d\s\d\d\d\d$/.test(req.sdate)) {
-    req.sdate = "01 " + req.sdate;
+  if (/^\d\d\s\d\d\d\d$/.test(req.body.sdate)) {
+    req.body.sdate = "01 " + req.body.sdate;
     req.body.is_month = true;
   } else {
     req.body.is_month = false;
@@ -221,13 +219,15 @@ const infoqueriesNeedColumns = [
 //// PROJECTS ////
 
 function projectsMonthKvartalCheck(req, res, next) {
+
   req.body.is_month = false;
   req.body.is_kvartal = false;
-  if (/^\d\d\s\d\d\d\d$/.test(req.sdate)) {
-    req.sdate = "01 " + req.sdate;
+  if (/^\d\d\s\d\d\d\d$/.test(req.body.sdate)) {
+    req.body.sdate = "01 " + req.body.sdate;
     req.body.is_month = true;
-  } else if (/^i{1,3}V?\s\d\d\d\d$/i.test(req.sdate)) {
-    let date = req.sdate.split(" ")[0];
+  } else if (/^i{1,3}V?\s\d\d\d\d$/i.test(req.body.sdate)) {
+
+    let date = req.body.sdate.split(" ")[0];
     if (date == "I") {
       date = "01 01";
     } else if (date == "II") {
@@ -237,7 +237,7 @@ function projectsMonthKvartalCheck(req, res, next) {
     } else {
       date = "01 10";
     }
-    req.sdate = date + req.sdate.split(" ")[1];
+    req.body.sdate = [date, req.body.sdate.split(" ")[1]].join(' ');
     req.body.is_kvartal = true;
   }
   next();
@@ -247,6 +247,7 @@ const projectsJsonedColumns = ["efficiency"];
 const projectsDates = ["sdate", "fdate"];
 
 const projectsNeedColumns = [
+  "id",
   "accompanying",
   "fdate",
   "sdate",
@@ -369,8 +370,9 @@ app.get("/vendor/showTabel", (req, res) => {
 });
 
 app.get("/vendor/showProjects", (req, res) => {
-  executeQuery("SELECT * FROM projects WHERE is_deleted = 0")
+  executeQuery("SELECT * FROM projects WHERE is_deleted = 0 OR is_deleted is NULL")
     .then((resultRows) => {
+
       prepareDatesForClient({
         all: ["fdate",'sdate'],
         month: ["sdate"],
@@ -403,7 +405,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err);
+
         res.status(400).end(JSOn.stringify(err));
       });
   }
@@ -427,15 +429,14 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err);
-        console.log(err);
+   
         res.status(400).end();
       });
   }
 );
 
 app.post("/vendor/deleteActivity", (req, res) => {
-  console.log(req.body);
+
   let sql = `UPDATE activities SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
@@ -472,7 +473,7 @@ app.post("/vendor/deleteEmployee", (req, res) => {
     });
 });
 app.post("/vendor/addEmployee", (req, res) => {
-  console.log("start");
+
   let sql = `SELECT * FROM employees WHERE nid='${req.body.nid}'`;
 
   executeQuery(sql)
@@ -510,13 +511,13 @@ app.post(
       req.body,
       id,
     ]);
-    console.log(sql);
+
     executeQuery(sql)
       .then(() => {
         res.end("OK");
       })
       .catch((err) => {
-        console.log(err);
+
         res.status(400).end(JSON.stringify(err));
       });
   }
@@ -537,7 +538,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err);
+        res.status(400).end(JSON.stringify(result.insertId));
       });
   }
 );
@@ -560,7 +561,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err);
+ 
 
         res.status(400).end();
       });
@@ -568,7 +569,7 @@ app.post(
 );
 
 app.post("/vendor/deleteInfoQuery", (req, res) => {
-  console.log(req.body);
+
   let sql = `UPDATE infoqueries SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
@@ -595,7 +596,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err);
+    
         res.status(400).end(JSOn.stringify(err));
       });
   }
@@ -614,6 +615,8 @@ app.post(
       req.body,
       id,
     ]);
+    
+
     executeQuery(query)
       .then((result) => {
         res.end(JSON.stringify(result.insertId));
@@ -624,7 +627,7 @@ app.post(
   }
 );
 app.post("/vendor/deleteProject", (req, res) => {
-  console.log(req.body);
+  
   let sql = `UPDATE projects SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
