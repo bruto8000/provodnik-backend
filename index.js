@@ -56,33 +56,30 @@ function prepareDatesForClient(settings) {
   //   }
   return function (rows) {
     rows.forEach((row) => {
-  
-
       settings.month &&
         settings.month.forEach((column) => {
           if (!row.is_month) return;
           if (typeof row[column] == "object") {
             row[column] = row[column].mmyyyy();
-   
-          } 
+          }
         });
 
-  settings.kvartal &&
+      settings.kvartal &&
         settings.kvartal.forEach((column) => {
           if (!row.is_kvartal) return;
           if (typeof row[column] == "object") {
-         
             row[column] = row[column].kkyyyy();
-         
-          } 
+          }
         });
 
       settings.all &&
         settings.all.forEach((column) => {
           if (typeof row[column] == "object") {
-        
             row[column] = row[column].ddmmyyyy();
-          } else if (typeof row[column] == "string" && /\d\d\d\d\-\d\d\-\d\d/.test(row[column]) ) {
+          } else if (
+            typeof row[column] == "string" &&
+            /\d\d\d\d\-\d\d\-\d\d/.test(row[column])
+          ) {
             row[column] = "";
           }
         });
@@ -91,7 +88,7 @@ function prepareDatesForClient(settings) {
 }
 function prepareJsonedColumnsForMysql(jsonedColumns) {
   return function (req, res, next) {
-   jsonedColumns.forEach((column) => {
+    jsonedColumns.forEach((column) => {
       if (!req.body[column]) return;
       req.body[column] = JSON.stringify(req.body[column]);
     });
@@ -126,6 +123,126 @@ function clearRequest(columnsNeed) {
     next();
   };
 }
+
+function convertDateToMysqlFormat(date) {
+  return [
+    date.getFullYear(),
+    date.getMonth() > 8 ? date.getMonth() + 1 : "0" + (date.getMonth() + 1),
+    date.getDate() > 9 ? date.getDate() : "0" + date.getDate(),
+  ].join("-");
+}
+
+function getDateDaysAgo(days) {
+  return new Date(new Date().getTime() - 60 * 60 * 24 * days * 1000);
+}
+
+function convertStringDateToNormalDate(stringDate,seperator = ' '){
+  let splitted = stringDate.split(seperator);
+  if(splitted.length != 3 || !/\d\d.\d\d.\d\d\d\d/.test(splitted)){
+    throw new Error('StringDate Must be in 3 parts AND format is :  dd mm yyyy');
+
+  }
+
+  return new Date(splitted[2],splitted[1]-1,splitted[0])
+
+}
+
+const schemas = {
+  activities: {
+    jsonedColumns: [
+      "flags",
+      "audits",
+      "AB",
+      "ocenka",
+      "statusZapusk",
+      "risks",
+      "bugs",
+      "eGrafiks",
+      "tags",
+      "zamenas",
+    ],
+    dates: ["sdate", "fdate"],
+    needColumns: [
+      "id",
+      "fdate",
+      "sdate",
+      "nazvanie",
+      "opisanieBody",
+      "zakazchik",
+      "bizness",
+      "zapusk",
+      "status",
+      "soprovod",
+      "ocenka",
+      "comments",
+      "audits",
+      "flags",
+      "AB",
+      "statusZapusk",
+      "risks",
+      "difficulty",
+      "bugs",
+      "dopinfo",
+      "eGrafiks",
+      "tags",
+      "zamenas",
+    ],
+    dateParseOptions: {
+      all: ["fdate", "sdate"],
+      month: ["sdate"],
+    }
+  },
+  infoQueries: {
+    jsonedColumns: ["statuses"],
+    dates: ["sdate", "fdate"],
+    needColumns: [
+      "archived",
+      "classification",
+      "is_deleted",
+      "fdate",
+      "id",
+      "inicatior",
+      "nazvanie",
+      "otchot",
+      "otvetfrom",
+      "otvetstveniy",
+      "problem",
+      "produkt",
+      "sdate",
+      "statuses",
+    ],
+    dateParseOptions : {
+      all: ["fdate", "sdate"],
+    }
+  },
+  projects: {
+    jsonedColumns: ["efficiency"],
+    dates: ["sdate", "fdate"],
+    needColumns: [
+      "id",
+      "accompanying",
+      "fdate",
+      "sdate",
+      "title",
+      "description",
+      "businessType",
+      "workGroup",
+      "status",
+      "CA",
+      "projectType",
+      "efficiency",
+    ],
+    dateParseOptions : {
+      all: ["fdate", "sdate"],
+      month: ["sdate"],
+      kvartal: ["sdate"],
+    }
+  },
+  employees: {
+    needColumns: ["id", "full_name", "login"],
+  },
+};
+
 ////// ACTIVITIES ///////
 function activitiesMonthCheck(req, res, next) {
   if (/^\d\d\s\d\d\d\d$/.test(req.body.sdate)) {
@@ -137,96 +254,15 @@ function activitiesMonthCheck(req, res, next) {
   next();
 }
 
-const activitiesJsonedColumns = [
-  "flags",
-  "audits",
-  "AB",
-  "ocenka",
-  "statusZapusk",
-  "risks",
-  "bugs",
-  "eGrafiks",
-  "tags",
-  "zamenas",
-];
-const activitiesDates = ["sdate", "fdate"];
-
-const activitiesNeedColumnsForEdit = [
-  "id",
-  "fdate",
-  "sdate",
-  "nazvanie",
-  "opisanieBody",
-  "zakazchik",
-  "bizness",
-  "zapusk",
-  "status",
-  "soprovod",
-  "ocenka",
-  "comments",
-  "audits",
-  "flags",
-  "AB",
-  "statusZapusk",
-  "risks",
-  "difficulty",
-  "bugs",
-  "dopinfo",
-  "eGrafiks",
-  "tags",
-  "zamenas",
-];
-const activitiesNeedColumnsForAdd = [
-  "fdate",
-  "sdate",
-  "nazvanie",
-  "opisanieBody",
-  "zakazchik",
-  "bizness",
-  "zapusk",
-  "status",
-  "soprovod",
-  "audits",
-  "flags",
-  "risks",
-  "difficulty",
-];
-
-//// Employees /////
-
-const employeesNeedColumnsForEdit = ["id", "full_name", "login"];
-
-//// INFOQUERIES ////
-
-const infoqueriesJsonedColumns = ["statuses"];
-const infoqueriesDates = ["sdate", "fdate"];
-const infoqueriesNeedColumns = [
-  "archived",
-  "classification",
-  "deleted",
-  "fdate",
-  "id",
-  "inicatior",
-  "nazvanie",
-  "otchot",
-  "otvetfrom",
-  "otvetstveniy",
-  "problem",
-  "produkt",
-  "sdate",
-  "statuses",
-];
 //// PROJECTS ////
 
 function projectsMonthKvartalCheck(req, res, next) {
-
   req.body.is_month = false;
   req.body.is_kvartal = false;
   if (/^\d\d\s\d\d\d\d$/.test(req.body.sdate)) {
     req.body.sdate = "01 " + req.body.sdate;
     req.body.is_month = true;
   } else if (/^i{1,3}V?\s\d\d\d\d$/i.test(req.body.sdate)) {
-
     let date = req.body.sdate.split(" ")[0];
     if (date == "I") {
       date = "01 01";
@@ -237,32 +273,14 @@ function projectsMonthKvartalCheck(req, res, next) {
     } else {
       date = "01 10";
     }
-    req.body.sdate = [date, req.body.sdate.split(" ")[1]].join(' ');
+    req.body.sdate = [date, req.body.sdate.split(" ")[1]].join(" ");
     req.body.is_kvartal = true;
   }
   next();
 }
 
-const projectsJsonedColumns = ["efficiency"];
-const projectsDates = ["sdate", "fdate"];
-
-const projectsNeedColumns = [
-  "id",
-  "accompanying",
-  "fdate",
-  "sdate",
-  "title",
-  "description",
-  "businessType",
-  "workGroup",
-  "status",
-  "CA",
-  "projectType",
-  "efficiency",
-];
-
-let dbCoinfig = require('./dbCoinfig');
-console.log(dbCoinfig)
+let dbCoinfig = require("./dbCoinfig");
+console.log(dbCoinfig);
 let connection;
 
 function handleDisconnect() {
@@ -294,6 +312,37 @@ app.all("*", (req, res, next) => {
   next();
 });
 
+app.get("/vendor/archived", (req, res) => {
+  let dataType = req.query.dataType;
+  let fdate = req.query.fdate;
+  let sdate = req.query.sdate;
+  console.log(dataType, fdate,sdate)
+  if (!schemas[dataType] || !fdate || !sdate) {
+    res.status(400).end("BAD REQUEST");
+    return;
+  }
+
+let sql = `SELECT * from ${dataType} where fdate between '${convertDateToMysqlFormat(convertStringDateToNormalDate(fdate))}' AND '${convertDateToMysqlFormat(convertStringDateToNormalDate(sdate))}'`
+
+executeQuery(
+ sql
+)
+  .then((resultRows) => {
+    prepareDatesForClient(schemas[dataType].dateParseOptions)(resultRows);
+    prepareJsonedColumnsForClient(schemas[dataType].jsonedColumns)(
+      resultRows
+    );
+
+    res.end(JSON.stringify(resultRows));
+  })
+  .catch((err) => {
+    console.log(err)
+    res.status(500).end("500");
+  });
+
+
+});
+
 app.get("/vendor/showEmployees", (req, res) => {
   executeQuery(
     "SELECT * FROM EMPLOYEES WHERE is_deleted = 0 OR is_deleted is null"
@@ -308,14 +357,18 @@ app.get("/vendor/showEmployees", (req, res) => {
 
 app.get("/vendor/showActivities", (req, res) => {
   executeQuery(
-    "SELECT * FROM activities WHERE is_deleted = 0 AND is_archived = 0"
+    `SELECT * FROM activities WHERE is_deleted = 0 AND is_archived = 0 AND fdate > '${convertDateToMysqlFormat(
+      getDateDaysAgo(180)
+    )}'`
   )
     .then((resultRows) => {
       prepareDatesForClient({
-        all: ["fdate","sdate"],
-        month: ["sdate"]
+        all: ["fdate", "sdate"],
+        month: ["sdate"],
       })(resultRows);
-      prepareJsonedColumnsForClient(activitiesJsonedColumns)(resultRows);
+      prepareJsonedColumnsForClient(schemas.activities.jsonedColumns)(
+        resultRows
+      );
 
       res.end(JSON.stringify(resultRows));
     })
@@ -325,12 +378,18 @@ app.get("/vendor/showActivities", (req, res) => {
 });
 
 app.get("/vendor/showInfoQueries", (req, res) => {
-  executeQuery("SELECT * FROM infoQueries")
+  executeQuery(
+    `SELECT * FROM infoQueries WHERE fdate > '${convertDateToMysqlFormat(
+      getDateDaysAgo(180)
+    )}'`
+  )
     .then((resultRows) => {
       prepareDatesForClient({
         all: ["fdate", "sdate"],
       })(resultRows);
-      prepareJsonedColumnsForClient(infoqueriesJsonedColumns)(resultRows);
+      prepareJsonedColumnsForClient(schemas.infoQueries.jsonedColumns)(
+        resultRows
+      );
 
       res.end(JSON.stringify(resultRows));
     })
@@ -365,15 +424,18 @@ app.get("/vendor/showTabel", (req, res) => {
 });
 
 app.get("/vendor/showProjects", (req, res) => {
-  executeQuery("SELECT * FROM projects WHERE is_deleted = 0 OR is_deleted is NULL")
+  executeQuery(
+    `SELECT * FROM projects WHERE  fdate > '${convertDateToMysqlFormat(
+      getDateDaysAgo(180)
+    )}' AND is_deleted = 0 OR is_deleted is NULL `
+  )
     .then((resultRows) => {
-
       prepareDatesForClient({
-        all: ["fdate",'sdate'],
+        all: ["fdate", "sdate"],
         month: ["sdate"],
         kvartal: ["sdate"],
       })(resultRows);
-      prepareJsonedColumnsForClient(projectsJsonedColumns)(resultRows);
+      prepareJsonedColumnsForClient(schemas.projects.jsonedColumns)(resultRows);
 
       res.end(JSON.stringify(resultRows));
     })
@@ -387,10 +449,10 @@ app.get("/vendor/showProjects", (req, res) => {
 
 app.post(
   "/vendor/addActivity",
-  clearRequest(activitiesNeedColumnsForAdd),
+  clearRequest(schemas.activities.needColumns),
   activitiesMonthCheck,
-  prepareDatesForMysql(activitiesDates),
-  prepareJsonedColumnsForMysql(activitiesJsonedColumns),
+  prepareDatesForMysql(schemas.activities.dates),
+  prepareJsonedColumnsForMysql(schemas.activities.jsonedColumns),
   (req, res, next) => {
     let sql = mysql.format("INSERT INTO activities SET  ?", req.body);
 
@@ -400,7 +462,6 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-
         res.status(400).end(JSOn.stringify(err));
       });
   }
@@ -408,10 +469,10 @@ app.post(
 
 app.post(
   "/vendor/editActivity",
-  clearRequest(activitiesNeedColumnsForEdit),
+  clearRequest(schemas.activities.needColumns),
   activitiesMonthCheck,
-  prepareDatesForMysql(activitiesDates),
-  prepareJsonedColumnsForMysql(activitiesJsonedColumns),
+  prepareDatesForMysql(schemas.activities.dates),
+  prepareJsonedColumnsForMysql(schemas.activities.jsonedColumns),
   (req, res, next) => {
     let id = req.body.id;
     delete req.body.id;
@@ -424,14 +485,12 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-   
         res.status(400).end();
       });
   }
 );
 
 app.post("/vendor/deleteActivity", (req, res) => {
-
   let sql = `UPDATE activities SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
@@ -468,7 +527,6 @@ app.post("/vendor/deleteEmployee", (req, res) => {
     });
 });
 app.post("/vendor/addEmployee", (req, res) => {
-
   let sql = `SELECT * FROM employees WHERE nid='${req.body.nid}'`;
 
   executeQuery(sql)
@@ -498,7 +556,7 @@ app.post("/vendor/addEmployee", (req, res) => {
 });
 app.post(
   "/vendor/editEmployee",
-  clearRequest(employeesNeedColumnsForEdit),
+  clearRequest(schemas.employees.needColumns),
   (req, res) => {
     let id = req.body.id;
     delete req.body.id;
@@ -512,7 +570,6 @@ app.post(
         res.end("OK");
       })
       .catch((err) => {
-
         res.status(400).end(JSON.stringify(err));
       });
   }
@@ -522,11 +579,11 @@ app.post(
 
 app.post(
   "/vendor/addInfoQuery",
-  clearRequest(infoqueriesNeedColumns),
-  prepareDatesForMysql(infoqueriesDates),
-  prepareJsonedColumnsForMysql(infoqueriesJsonedColumns),
+  clearRequest(schemas.infoQueries.needColumns),
+  prepareDatesForMysql(schemas.infoQueries.dates),
+  prepareJsonedColumnsForMysql(schemas.infoQueries.jsonedColumns),
   (req, res) => {
-    let query = mysql.format("INSERT INTO infoqueries SET  ?", req.body);
+    let query = mysql.format("INSERT INTO infoQueries SET  ?", req.body);
 
     executeQuery(query)
       .then((result) => {
@@ -540,14 +597,14 @@ app.post(
 
 app.post(
   "/vendor/editInfoQuery",
-  clearRequest(infoqueriesNeedColumns),
-  prepareDatesForMysql(infoqueriesDates),
-  prepareJsonedColumnsForMysql(infoqueriesJsonedColumns),
+  clearRequest(schemas.infoQueries.needColumns),
+  prepareDatesForMysql(schemas.infoQueries.dates),
+  prepareJsonedColumnsForMysql(schemas.infoQueries.jsonedColumns),
 
   (req, res, next) => {
     let id = req.body.id;
     delete req.body.id;
-    let query = mysql.format("UPDATE  infoqueries SET  ? WHERE id=?", [
+    let query = mysql.format("UPDATE  infoQueries SET  ? WHERE id=?", [
       req.body,
       id,
     ]);
@@ -556,16 +613,13 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
- 
-
         res.status(400).end();
       });
   }
 );
 
 app.post("/vendor/deleteInfoQuery", (req, res) => {
-
-  let sql = `UPDATE infoqueries SET is_deleted = true WHERE id=${req.body.id}`;
+  let sql = `UPDATE infoQueries SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
     .then(() => {
@@ -580,10 +634,10 @@ app.post("/vendor/deleteInfoQuery", (req, res) => {
 
 app.post(
   "/vendor/addProject",
-  clearRequest(projectsNeedColumns),
+  clearRequest(schemas.projects.needColumns),
   projectsMonthKvartalCheck,
-  prepareDatesForMysql(projectsDates),
-  prepareJsonedColumnsForMysql(projectsJsonedColumns),
+  prepareDatesForMysql(schemas.projects.dates),
+  prepareJsonedColumnsForMysql(schemas.projects.jsonedColumns),
   (req, res, next) => {
     let sql = mysql.format("INSERT INTO projects SET  ?", req.body);
     executeQuery(sql)
@@ -591,7 +645,6 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-    
         res.status(400).end(JSOn.stringify(err));
       });
   }
@@ -599,10 +652,10 @@ app.post(
 
 app.post(
   "/vendor/editProject",
-  clearRequest(projectsNeedColumns),
+  clearRequest(schemas.projects.needColumns),
   projectsMonthKvartalCheck,
-  prepareDatesForMysql(projectsDates),
-  prepareJsonedColumnsForMysql(projectsJsonedColumns),
+  prepareDatesForMysql(schemas.projects.dates),
+  prepareJsonedColumnsForMysql(schemas.projects.jsonedColumns),
   (req, res, next) => {
     let id = req.body.id;
     delete req.body.id;
@@ -610,7 +663,6 @@ app.post(
       req.body,
       id,
     ]);
-    
 
     executeQuery(query)
       .then((result) => {
@@ -622,7 +674,6 @@ app.post(
   }
 );
 app.post("/vendor/deleteProject", (req, res) => {
-  
   let sql = `UPDATE projects SET is_deleted = true WHERE id=${req.body.id}`;
 
   executeQuery(sql)
