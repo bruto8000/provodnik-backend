@@ -136,15 +136,15 @@ function getDateDaysAgo(days) {
   return new Date(new Date().getTime() - 60 * 60 * 24 * days * 1000);
 }
 
-function convertStringDateToNormalDate(stringDate,seperator = ' '){
+function convertStringDateToNormalDate(stringDate, seperator = " ") {
   let splitted = stringDate.split(seperator);
-  if(splitted.length != 3 || !/\d\d.\d\d.\d\d\d\d/.test(splitted)){
-    throw new Error('StringDate Must be in 3 parts AND format is :  dd mm yyyy');
-
+  if (splitted.length != 3 || !/\d\d.\d\d.\d\d\d\d/.test(splitted)) {
+    throw new Error(
+      "StringDate Must be in 3 parts AND format is :  dd mm yyyy"
+    );
   }
 
-  return new Date(splitted[2],splitted[1]-1,splitted[0])
-
+  return new Date(splitted[2], splitted[1] - 1, splitted[0]);
 }
 
 const schemas = {
@@ -174,7 +174,7 @@ const schemas = {
       "status",
       "soprovod",
       "ocenka",
-      "comments",
+
       "audits",
       "flags",
       "AB",
@@ -190,13 +190,12 @@ const schemas = {
     dateParseOptions: {
       all: ["fdate", "sdate"],
       month: ["sdate"],
-    }
+    },
   },
   infoQueries: {
     jsonedColumns: ["statuses"],
     dates: ["sdate", "fdate"],
     needColumns: [
-      "archived",
       "classification",
       "is_deleted",
       "fdate",
@@ -211,9 +210,9 @@ const schemas = {
       "sdate",
       "statuses",
     ],
-    dateParseOptions : {
+    dateParseOptions: {
       all: ["fdate", "sdate"],
-    }
+    },
   },
   projects: {
     jsonedColumns: ["efficiency"],
@@ -232,11 +231,11 @@ const schemas = {
       "projectType",
       "efficiency",
     ],
-    dateParseOptions : {
+    dateParseOptions: {
       all: ["fdate", "sdate"],
       month: ["sdate"],
       kvartal: ["sdate"],
-    }
+    },
   },
   employees: {
     needColumns: ["id", "full_name", "login"],
@@ -316,31 +315,29 @@ app.get("/vendor/archived", (req, res) => {
   let dataType = req.query.dataType;
   let fdate = req.query.fdate;
   let sdate = req.query.sdate;
-  console.log(dataType, fdate,sdate)
+  console.log(dataType, fdate, sdate);
   if (!schemas[dataType] || !fdate || !sdate) {
     res.status(400).end("BAD REQUEST");
     return;
   }
 
-let sql = `SELECT * from ${dataType} where fdate between '${convertDateToMysqlFormat(convertStringDateToNormalDate(fdate))}' AND '${convertDateToMysqlFormat(convertStringDateToNormalDate(sdate))}'`
+  let sql = `SELECT * from ${dataType} where fdate between '${convertDateToMysqlFormat(
+    convertStringDateToNormalDate(fdate)
+  )}' AND '${convertDateToMysqlFormat(convertStringDateToNormalDate(sdate))}'`;
 
-executeQuery(
- sql
-)
-  .then((resultRows) => {
-    prepareDatesForClient(schemas[dataType].dateParseOptions)(resultRows);
-    prepareJsonedColumnsForClient(schemas[dataType].jsonedColumns)(
-      resultRows
-    );
+  executeQuery(sql)
+    .then((resultRows) => {
+      prepareDatesForClient(schemas[dataType].dateParseOptions)(resultRows);
+      prepareJsonedColumnsForClient(schemas[dataType].jsonedColumns)(
+        resultRows
+      );
 
-    res.end(JSON.stringify(resultRows));
-  })
-  .catch((err) => {
-    console.log(err)
-    res.status(500).end("500");
-  });
-
-
+      res.end(JSON.stringify(resultRows));
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).end("500");
+    });
 });
 
 app.get("/vendor/showEmployees", (req, res) => {
@@ -381,7 +378,7 @@ app.get("/vendor/showInfoQueries", (req, res) => {
   executeQuery(
     `SELECT * FROM infoQueries WHERE fdate > '${convertDateToMysqlFormat(
       getDateDaysAgo(180)
-    )}'`
+    )}' OR fdate = '0000-00-00'`
   )
     .then((resultRows) => {
       prepareDatesForClient({
@@ -462,7 +459,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        res.status(400).end(JSOn.stringify(err));
+        res.status(400).end(JSON.stringify(err));
       });
   }
 );
@@ -480,12 +477,16 @@ app.post(
       req.body,
       id,
     ]);
+
+    console.log(JSON.stringify(req.body, null, 4));
+
     executeQuery(query)
       .then((result) => {
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        res.status(400).end();
+        console.log(err);
+        res.status(500).end();
       });
   }
 );
@@ -590,7 +591,8 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        res.status(400).end(JSON.stringify(result.insertId));
+        console.log(err);
+        res.status(400).end(JSON.stringify(err));
       });
   }
 );
@@ -683,6 +685,30 @@ app.post("/vendor/deleteProject", (req, res) => {
     .catch((err) => {
       res.status(400).end(err.toString());
     });
+});
+ 
+app.post("/vendor/saveTabel", (req, res) => {
+  let isErrorGetted = false;
+  let completedQueries = 0;
+  req.body.forEach((day, idxOfDay) => {
+    if (isErrorGetted) return;
+    let sql = `UPDATE tabel SET body='${JSON.stringify(day.body)}' WHERE id=${
+      day.id
+    }`;
+    executeQuery(sql)
+      .then(() => {
+        completedQueries ++;
+        if (isErrorGetted) return;
+        if (completedQueries === req.body.length - 1) {
+          res.end("OK");
+        }
+      })
+      .catch((err) => {
+        isErrorGetted = true;
+        console.log("ERROR", err);
+        res.status(500).end(err.toString());
+      });
+  });
 });
 
 app.all("*", (req, res) => {
