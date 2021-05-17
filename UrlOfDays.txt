@@ -1,0 +1,1 @@
+ "https://isdayoff.ru/api/getdata?year=2021&pre=0&delimeter=DAY"

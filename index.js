@@ -2,9 +2,9 @@ const express = require("express");
 const bodyParser = require("body-parser");
 
 const app = express();
-
+const fs = require('fs');
 const mysql = require("mysql");
-
+const cors = require('cors');
 ///////////////////// CONFIGS ////////////////////////////////
 Date.prototype.ddmmyyyy = function () {
   let mm = this.getMonth() + 1; // getMonth() is zero-based
@@ -215,7 +215,7 @@ const schemas = {
     },
   },
   projects: {
-    jsonedColumns: ["efficiency"],
+    jsonedColumns: ["efficiency",'workGroup'],
     dates: ["sdate", "fdate"],
     needColumns: [
       "id",
@@ -303,8 +303,7 @@ handleDisconnect();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-
-// app.use((req, res, next) => {});
+app.use(cors())
 app.all("*", (req, res, next) => {
   console.log(`request URL : ${req.url} //\\\\ METHOD IS ${req.method}`);
 
@@ -338,6 +337,18 @@ app.get("/vendor/archived", (req, res) => {
       console.log(err);
       res.status(500).end("500");
     });
+});
+
+app.get("/vendor/showHolidays", (req, res) => {
+
+  fs.readFile('./Holidays.txt','utf-8',(err,data)=>{
+    if(err){
+      res.status(500).end('500');
+      return;
+    }
+
+    res.end(data)
+  })
 });
 
 app.get("/vendor/showEmployees", (req, res) => {
@@ -459,6 +470,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
+        console.log(err)
         res.status(400).end(JSON.stringify(err));
       });
   }
