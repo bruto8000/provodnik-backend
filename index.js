@@ -378,7 +378,7 @@ app.get("/vendor/showActivities", (req, res) => {
         resultRows
       );
 
-      res.end(JSON.stringify(resultRows));
+      res.end(JSON.stringify(resultRows) || []);
     })
     .catch((err) => {
       res.status(500).end("500");
