@@ -1,10 +1,15 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-
-const app = express();
-const fs = require('fs');
+const path = require("path");
+const fs = require("fs");
 const mysql = require("mysql");
-const cors = require('cors');
+const cors = require("cors");
+console.log(__dirname);
+const https = require("https");
+const { authRouter } = require("./auth");
+const app = express();
+
+// .createServer(credentials);
 ///////////////////// CONFIGS ////////////////////////////////
 Date.prototype.ddmmyyyy = function () {
   let mm = this.getMonth() + 1; // getMonth() is zero-based
@@ -16,7 +21,6 @@ Date.prototype.ddmmyyyy = function () {
     this.getFullYear(),
   ].join(" ");
 };
-
 Date.prototype.mmyyyy = function () {
   let mm = this.getMonth() + 1; // getMonth() is zero-based
 
@@ -37,6 +41,7 @@ Date.prototype.kkyyyy = function () {
 
   return [kk, this.getFullYear()].join(" ");
 };
+const { executeQuery } = require("./utils/utils");
 function prepareDatesForMysql(columnsOfDates) {
   return function (req, res, next) {
     columnsOfDates.forEach((column) => {
@@ -215,7 +220,7 @@ const schemas = {
     },
   },
   projects: {
-    jsonedColumns: ["efficiency",'workGroup'],
+    jsonedColumns: ["efficiency", "workGroup"],
     dates: ["sdate", "fdate"],
     needColumns: [
       "id",
@@ -278,35 +283,33 @@ function projectsMonthKvartalCheck(req, res, next) {
   next();
 }
 
-let dbCoinfig = require("./dbCoinfig");
-console.log(dbCoinfig);
-let connection;
+app.use(express.urlencoded({ extended: false, limit: "50mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(cors());
 
-function handleDisconnect() {
-  connection = mysql.createConnection(dbCoinfig);
+let session = require("express-session");
+let MySQLStore = require("express-mysql-session")(session);
+// or mysql.createPool(options);
 
-  connection.connect(function (err) {
-    if (err) {
-      setTimeout(handleDisconnect, 2000);
-    }
-  });
+const { connection } = require("./connection");
+let sessionStore = new MySQLStore(
+  { expiration: 24 * 60 * 60 * 1000 } /* session store options */,
+  connection
+);
 
-  connection.on("error", function (err) {
-    if (err.code === "PROTOCOL_CONNECTION_LOST") {
-      handleDisconnect();
-    } else {
-      throw err;
-    }
-  });
-}
-handleDisconnect();
+app.use(
+  session({
+    key: "project_mi_session",
+    secret: "projectmiVerySecretKeyByBruto",
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { httpOnly: true },
+  })
+);
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
-app.use(cors())
 app.all("*", (req, res, next) => {
   console.log(`request URL : ${req.url} //\\\\ METHOD IS ${req.method}`);
-
   next();
 });
 
@@ -340,15 +343,19 @@ app.get("/vendor/archived", (req, res) => {
 });
 
 app.get("/vendor/showHolidays", (req, res) => {
+  fs.readFile(
+    path.resolve(__dirname, "./holidays.txt"),
+    "utf-8",
+    (err, data) => {
+      if (err) {
+        console.log(err);
+        res.status(500).end("500");
+        return;
+      }
 
-  fs.readFile('./Holidays.txt','utf-8',(err,data)=>{
-    if(err){
-      res.status(500).end('500');
-      return;
+      res.end(data);
     }
-
-    res.end(data)
-  })
+  );
 });
 
 app.get("/vendor/showEmployees", (req, res) => {
@@ -470,7 +477,7 @@ app.post(
         res.end(JSON.stringify(result.insertId));
       })
       .catch((err) => {
-        console.log(err)
+        console.log(err);
         res.status(400).end(JSON.stringify(err));
       });
   }
@@ -540,7 +547,7 @@ app.post("/vendor/deleteEmployee", (req, res) => {
     });
 });
 app.post("/vendor/addEmployee", (req, res) => {
-  let sql = `SELECT * FROM employees WHERE nid='${req.body.nid}'`;
+  let sql = `SELECT * FROM employees WHERE nid='${req.body.nid}' OR login ='${req.body.login}'`;
 
   executeQuery(sql)
     .catch((err) => {
@@ -698,7 +705,7 @@ app.post("/vendor/deleteProject", (req, res) => {
       res.status(400).end(err.toString());
     });
 });
- 
+
 app.post("/vendor/saveTabel", (req, res) => {
   let isErrorGetted = false;
   let completedQueries = 0;
@@ -709,7 +716,7 @@ app.post("/vendor/saveTabel", (req, res) => {
     }`;
     executeQuery(sql)
       .then(() => {
-        completedQueries ++;
+        completedQueries++;
         if (isErrorGetted) return;
         if (completedQueries === req.body.length - 1) {
           res.end("OK");
@@ -723,19 +730,11 @@ app.post("/vendor/saveTabel", (req, res) => {
   });
 });
 
+app.use("/vendor/auth", authRouter);
+
 app.all("*", (req, res) => {
   res.status(404).end("NOT FOUND");
 });
 
-function executeQuery(query) {
-  return new Promise((resolve, reject) => {
-    connection.query(query, function (error, result, field) {
-      if (error) {
-        reject(error);
-      }
-      resolve(result);
-    });
-  });
-}
-
-app.listen(3000, console.log("server started ON PORT 3000"));
+// let httpsServer = https.createServer(credentials, app);
+app.listen(3002, console.log("server started ON PORT 3002"));
