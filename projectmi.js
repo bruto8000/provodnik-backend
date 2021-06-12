@@ -235,6 +235,7 @@ const schemas = {
       "CA",
       "projectType",
       "efficiency",
+      "comment",
     ],
     dateParseOptions: {
       all: ["fdate", "sdate"],
@@ -293,7 +294,7 @@ let MySQLStore = require("express-mysql-session")(session);
 
 const { connection } = require("./connection");
 let sessionStore = new MySQLStore(
-  { expiration: 24 * 60 * 60 * 1000 } /* session store options */,
+  { expiration: 365 * 24 * 60 * 60 * 1000 } /* session store options */,
   connection
 );
 
@@ -360,7 +361,7 @@ app.get("/vendor/showHolidays", (req, res) => {
 
 app.get("/vendor/showEmployees", (req, res) => {
   executeQuery(
-    "SELECT * FROM EMPLOYEES WHERE is_deleted = 0 OR is_deleted is null"
+    "SELECT * FROM EMPLOYEES WHERE is_deleted = 0 OR is_deleted is null ORDER BY full_name DESC"
   )
     .then((results) => {
       res.end(JSON.stringify(results));
