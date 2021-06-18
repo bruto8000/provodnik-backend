@@ -120,8 +120,9 @@ async function loginUserAndSetRole(req, res, next) {
       throw new Error(`employees MUST be in DB. Received ${employees}`);
     }
     let employee = employees[0];
-    req.session.role = "admin";
-    res.status(200).json({ role: req.session.role });
+    req.session.role = employee.role;
+    req.session.login = employee.login;
+    res.status(200).json({ role: req.session.role, login: req.session.login });
   } catch (err) {
     console.log(err);
     res.status(500).end();

@@ -244,7 +244,7 @@ const schemas = {
     },
   },
   employees: {
-    needColumns: ["id", "full_name", "login"],
+    needColumns: ["id", "full_name", "login", "role"],
   },
 };
 
@@ -313,7 +313,7 @@ app.all("*", (req, res, next) => {
   console.log(`request URL : ${req.url} //\\\\ METHOD IS ${req.method}`);
   next();
 });
-
+app.use(express.static("./public"));
 app.get("/vendor/archived", (req, res) => {
   let dataType = req.query.dataType;
   let fdate = req.query.fdate;
@@ -562,6 +562,7 @@ app.post("/vendor/addEmployee", (req, res) => {
           nid: req.body.nid,
           login: req.body.login,
           full_name: req.body.full_name,
+          role: req.body.role,
         });
 
         executeQuery(sql)

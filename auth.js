@@ -16,7 +16,7 @@ router.post(
 );
 router.get("/role", (req, res) => {
   console.log("role");
-  res.status(200).json({ role: req.session.role });
+  res.status(200).json({ role: req.session.role, login: req.session.login });
 });
 
 module.exports = { authRouter: router };
